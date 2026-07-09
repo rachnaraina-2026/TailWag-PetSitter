@@ -83,10 +83,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Happy Paws — Reliable Dog Walking for Busy Pet Parents" },
       { name: "description", content: "Professional, insured dog walkers who treat your dog like family. Book GPS-tracked walks in minutes." },
       { name: "author", content: "Happy Paws" },
-      { property: "og:title", content: "Happy Paws — Reliable Dog Walking" },
-      { property: "og:description", content: "Book insured, background-checked walkers for GPS-tracked walks with photo updates." },
+      { property: "og:title", content: "Happy Paws — Reliable Dog Walking for Busy Pet Parents" },
+      { property: "og:description", content: "Professional, insured dog walkers who treat your dog like family. Book GPS-tracked walks in minutes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Happy Paws — Reliable Dog Walking for Busy Pet Parents" },
+      { name: "twitter:description", content: "Professional, insured dog walkers who treat your dog like family. Book GPS-tracked walks in minutes." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/06719909-24f9-4c2e-87a8-9d9d1886f4a7/id-preview-5cb0ef6f--e2a88b63-db9c-45ed-9b4d-1c509ec62b83.lovable.app-1783625331390.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/06719909-24f9-4c2e-87a8-9d9d1886f4a7/id-preview-5cb0ef6f--e2a88b63-db9c-45ed-9b4d-1c509ec62b83.lovable.app-1783625331390.png" },
     ],
     links: [
       {
