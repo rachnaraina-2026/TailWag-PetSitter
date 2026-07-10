@@ -225,11 +225,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const updateDog = useCallback(async (id: string, patch: Partial<Dog>) => {
-    const upd: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(patch)) {
-      if (k === "id") continue;
-      upd[k] = v === "" ? null : v;
-    }
+    const upd = {
+      ...(patch.name !== undefined && { name: patch.name }),
+      ...(patch.breed !== undefined && { breed: patch.breed }),
+      ...(patch.age !== undefined && { age: patch.age }),
+      ...(patch.weight !== undefined && { weight: patch.weight }),
+      ...(patch.photo !== undefined && { photo: patch.photo || null }),
+      ...(patch.energy !== undefined && { energy: patch.energy }),
+      ...(patch.medical !== undefined && { medical: patch.medical || null }),
+      ...(patch.behavior !== undefined && { behavior: patch.behavior || null }),
+      ...(patch.emergency !== undefined && { emergency: patch.emergency || null }),
+      ...(patch.vet !== undefined && { vet: patch.vet || null }),
+      ...(patch.feeding !== undefined && { feeding: patch.feeding || null }),
+    };
     const { error } = await supabase.from("dogs").update(upd).eq("id", id);
     if (error) throw error;
     setDogs((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
