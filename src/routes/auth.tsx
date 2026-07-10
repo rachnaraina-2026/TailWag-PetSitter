@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,23 +19,51 @@ export const Route = createFileRoute("/auth")({
 });
 
 function Auth() {
-  const { login } = useStore();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
+  const [busy, setBusy] = useState(false);
 
-  const handle = (e: React.FormEvent<HTMLFormElement>) => {
+  const handle = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const email = String(fd.get("email") || "");
-    const name = String(fd.get("name") || "");
-    if (mode === "reset") {
-      toast.success("Password reset link sent (demo)");
-      setMode("login");
-      return;
+    const email = String(fd.get("email") || "").trim();
+    const password = String(fd.get("password") || "");
+    const name = String(fd.get("name") || "").trim();
+    setBusy(true);
+    try {
+      if (mode === "reset") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Password reset link sent — check your email.");
+        setMode("login");
+        return;
+      }
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: { name },
+          },
+        });
+        if (error) throw error;
+        toast.success(`Welcome${name ? `, ${name}` : "!"}`);
+        navigate({ to: "/dashboard" });
+        return;
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Welcome back!");
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(msg);
+    } finally {
+      setBusy(false);
     }
-    login(email, name);
-    toast.success(`Welcome${name ? `, ${name}` : "!"}`);
-    navigate({ to: "/dashboard" });
   };
 
   return (
@@ -64,7 +92,7 @@ function Auth() {
                   <Input id="password" name="password" type="password" required autoComplete="current-password" className="mt-1.5" />
                 </div>
               )}
-              <Button type="submit" className="w-full rounded-full gradient-primary text-white">
+              <Button type="submit" disabled={busy} className="w-full rounded-full gradient-primary text-white">
                 {mode === "reset" ? "Send reset link" : "Log in"}
               </Button>
               <button type="button" onClick={() => setMode(mode === "reset" ? "login" : "reset")} className="mt-2 w-full text-center text-xs text-muted-foreground hover:text-primary">
@@ -86,7 +114,7 @@ function Auth() {
                 <Label htmlFor="password2">Password</Label>
                 <Input id="password2" name="password" type="password" required minLength={6} className="mt-1.5" />
               </div>
-              <Button type="submit" className="w-full rounded-full gradient-primary text-white">Create account</Button>
+              <Button type="submit" disabled={busy} className="w-full rounded-full gradient-primary text-white">Create account</Button>
             </form>
           </TabsContent>
         </Tabs>
