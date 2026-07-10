@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 export type Dog = {
   id: string;
@@ -109,73 +111,143 @@ export const TIME_SLOTS = [
 
 type StoreCtx = {
   user: User;
-  login: (email: string, name?: string) => void;
-  logout: () => void;
+  loading: boolean;
+  logout: () => Promise<void>;
   dogs: Dog[];
-  addDog: (d: Omit<Dog, "id">) => Dog;
-  updateDog: (id: string, d: Partial<Dog>) => void;
-  removeDog: (id: string) => void;
+  addDog: (d: Omit<Dog, "id">) => Promise<Dog>;
+  updateDog: (id: string, d: Partial<Dog>) => Promise<void>;
+  removeDog: (id: string) => Promise<void>;
   bookings: Booking[];
-  addBooking: (b: Omit<Booking, "id" | "status" | "walker" | "createdAt">) => Booking;
-  cancelBooking: (id: string) => void;
+  addBooking: (b: Omit<Booking, "id" | "status" | "walker" | "createdAt">) => Promise<Booking>;
+  cancelBooking: (id: string) => Promise<void>;
   getBooking: (id: string) => Booking | undefined;
   isSlotTaken: (date: string, time: string) => boolean;
 };
 
 const Ctx = createContext<StoreCtx | null>(null);
 
-function useLocal<T>(key: string, initial: T) {
-  const [v, setV] = useState<T>(initial);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) setV(JSON.parse(raw));
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(v));
-    } catch {}
-  }, [key, v]);
-  return [v, setV] as const;
+type DogRow = {
+  id: string; name: string; breed: string; age: number; weight: number;
+  photo: string | null; energy: string; medical: string | null;
+  behavior: string | null; emergency: string | null; vet: string | null; feeding: string | null;
+};
+type BookingRow = {
+  id: string; reference: string; dog_ids: string[]; service_id: string;
+  date: string; time: string; notes: string | null; status: string;
+  walker: string; price: number; created_at: string;
+};
+
+function rowToDog(r: DogRow): Dog {
+  return {
+    id: r.id, name: r.name, breed: r.breed, age: Number(r.age), weight: Number(r.weight),
+    photo: r.photo ?? undefined, energy: (r.energy as Dog["energy"]) || "Medium",
+    medical: r.medical ?? "", behavior: r.behavior ?? "", emergency: r.emergency ?? "",
+    vet: r.vet ?? "", feeding: r.feeding ?? "",
+  };
+}
+function rowToBooking(r: BookingRow): Booking {
+  return {
+    id: r.id, dogIds: r.dog_ids ?? [], serviceId: r.service_id,
+    date: r.date, time: r.time, notes: r.notes ?? "",
+    status: r.status as BookingStatus, walker: r.walker,
+    price: Number(r.price), createdAt: r.created_at,
+  };
+}
+
+function makeReference() {
+  return "HP-" + Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useLocal<User>("hp_user", null);
-  const [dogs, setDogs] = useLocal<Dog[]>("hp_dogs", []);
-  const [bookings, setBookings] = useLocal<Booking[]>("hp_bookings", []);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User>(null);
+  const [loading, setLoading] = useState(true);
+  const [dogs, setDogs] = useState<Dog[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
-  const login = useCallback(
-    (email: string, name?: string) => {
-      setUser({
-        id: crypto.randomUUID(),
-        email,
-        name: name || email.split("@")[0],
-      });
-    },
-    [setUser],
-  );
+  // Auth listener + initial session
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
+      setSession(s);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
-  const logout = useCallback(() => setUser(null), [setUser]);
+  // Map session to app user + load profile name
+  useEffect(() => {
+    if (!session?.user) {
+      setUser(null);
+      setDogs([]);
+      setBookings([]);
+      return;
+    }
+    const u = session.user;
+    setUser({
+      id: u.id,
+      email: u.email ?? "",
+      name: (u.user_metadata?.name as string) || (u.email?.split("@")[0] ?? "Friend"),
+    });
+    // Fetch profile display name (best effort)
+    supabase.from("profiles").select("name").eq("id", u.id).maybeSingle().then(({ data }) => {
+      if (data?.name) setUser((prev) => (prev ? { ...prev, name: data.name } : prev));
+    });
+    // Load dogs + bookings
+    supabase.from("dogs").select("*").order("created_at", { ascending: true }).then(({ data }) => {
+      if (data) setDogs(data.map((r) => rowToDog(r as unknown as DogRow)));
+    });
+    supabase.from("bookings").select("*").order("date", { ascending: false }).then(({ data }) => {
+      if (data) setBookings(data.map((r) => rowToBooking(r as unknown as BookingRow)));
+    });
+  }, [session]);
 
-  const addDog = useCallback(
-    (d: Omit<Dog, "id">) => {
-      const dog: Dog = { ...d, id: crypto.randomUUID() };
-      setDogs((prev) => [...prev, dog]);
-      return dog;
-    },
-    [setDogs],
-  );
-  const updateDog = useCallback(
-    (id: string, patch: Partial<Dog>) =>
-      setDogs((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d))),
-    [setDogs],
-  );
-  const removeDog = useCallback(
-    (id: string) => setDogs((prev) => prev.filter((d) => d.id !== id)),
-    [setDogs],
-  );
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
+
+  const addDog = useCallback(async (d: Omit<Dog, "id">) => {
+    if (!user) throw new Error("Not signed in");
+    const payload = {
+      user_id: user.id,
+      name: d.name, breed: d.breed, age: d.age, weight: d.weight,
+      photo: d.photo || null, energy: d.energy,
+      medical: d.medical || null, behavior: d.behavior || null,
+      emergency: d.emergency || null, vet: d.vet || null, feeding: d.feeding || null,
+    };
+    const { data, error } = await supabase.from("dogs").insert(payload).select("*").single();
+    if (error || !data) throw error ?? new Error("Insert failed");
+    const dog = rowToDog(data as unknown as DogRow);
+    setDogs((prev) => [...prev, dog]);
+    return dog;
+  }, [user]);
+
+  const updateDog = useCallback(async (id: string, patch: Partial<Dog>) => {
+    const upd = {
+      ...(patch.name !== undefined && { name: patch.name }),
+      ...(patch.breed !== undefined && { breed: patch.breed }),
+      ...(patch.age !== undefined && { age: patch.age }),
+      ...(patch.weight !== undefined && { weight: patch.weight }),
+      ...(patch.photo !== undefined && { photo: patch.photo || null }),
+      ...(patch.energy !== undefined && { energy: patch.energy }),
+      ...(patch.medical !== undefined && { medical: patch.medical || null }),
+      ...(patch.behavior !== undefined && { behavior: patch.behavior || null }),
+      ...(patch.emergency !== undefined && { emergency: patch.emergency || null }),
+      ...(patch.vet !== undefined && { vet: patch.vet || null }),
+      ...(patch.feeding !== undefined && { feeding: patch.feeding || null }),
+    };
+    const { error } = await supabase.from("dogs").update(upd).eq("id", id);
+    if (error) throw error;
+    setDogs((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  }, []);
+
+  const removeDog = useCallback(async (id: string) => {
+    const { error } = await supabase.from("dogs").delete().eq("id", id);
+    if (error) throw error;
+    setDogs((prev) => prev.filter((d) => d.id !== id));
+  }, []);
 
   const isSlotTaken = useCallback(
     (date: string, time: string) =>
@@ -185,28 +257,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [bookings],
   );
 
-  const addBooking = useCallback(
-    (b: Omit<Booking, "id" | "status" | "walker" | "createdAt">) => {
-      const booking: Booking = {
-        ...b,
-        id: "HP-" + Math.random().toString(36).slice(2, 8).toUpperCase(),
-        status: "Confirmed",
-        walker: WALKERS[Math.floor(Math.random() * WALKERS.length)],
-        createdAt: new Date().toISOString(),
-      };
-      setBookings((prev) => [booking, ...prev]);
-      return booking;
-    },
-    [setBookings],
-  );
+  const addBooking = useCallback(async (b: Omit<Booking, "id" | "status" | "walker" | "createdAt">) => {
+    if (!user) throw new Error("Not signed in");
+    const walker = WALKERS[Math.floor(Math.random() * WALKERS.length)];
+    const payload = {
+      user_id: user.id,
+      reference: makeReference(),
+      dog_ids: b.dogIds,
+      service_id: b.serviceId,
+      date: b.date,
+      time: b.time,
+      notes: b.notes || null,
+      status: "Confirmed",
+      walker,
+      price: b.price,
+    };
+    const { data, error } = await supabase.from("bookings").insert(payload).select("*").single();
+    if (error || !data) throw error ?? new Error("Insert failed");
+    const booking = rowToBooking(data as unknown as BookingRow);
+    setBookings((prev) => [booking, ...prev]);
+    return booking;
+  }, [user]);
 
-  const cancelBooking = useCallback(
-    (id: string) =>
-      setBookings((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, status: "Cancelled" } : b)),
-      ),
-    [setBookings],
-  );
+  const cancelBooking = useCallback(async (id: string) => {
+    const { error } = await supabase.from("bookings").update({ status: "Cancelled" }).eq("id", id);
+    if (error) throw error;
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status: "Cancelled" } : b)),
+    );
+  }, []);
 
   const getBooking = useCallback(
     (id: string) => bookings.find((b) => b.id === id),
@@ -216,7 +295,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreCtx>(
     () => ({
       user,
-      login,
+      loading,
       logout,
       dogs,
       addDog,
@@ -230,7 +309,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
-      login,
+      loading,
       logout,
       dogs,
       addDog,

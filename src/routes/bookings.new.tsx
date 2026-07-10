@@ -46,11 +46,15 @@ function BookWalk() {
     (step === 3 && time) ||
     step === 4 || step === 5;
 
-  const submit = () => {
+  const submit = async () => {
     if (!svc || !dateISO || !time || dogIds.length === 0) return;
-    const b = addBooking({ dogIds, serviceId, date: dateISO, time, notes, price: svc.price });
-    toast.success("🎉 Booking confirmed!");
-    navigate({ to: "/bookings/$id", params: { id: b.id }, search: { just: "1" } as never });
+    try {
+      const b = await addBooking({ dogIds, serviceId, date: dateISO, time, notes, price: svc.price });
+      toast.success("🎉 Booking confirmed!");
+      navigate({ to: "/bookings/$id", params: { id: b.id }, search: { just: "1" } as never });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not confirm booking");
+    }
   };
 
   if (dogs.length === 0) {

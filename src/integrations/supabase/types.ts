@@ -14,7 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bookings: {
+        Row: {
+          created_at: string
+          date: string
+          dog_ids: string[]
+          id: string
+          notes: string | null
+          price: number
+          reference: string
+          service_id: string
+          status: string
+          time: string
+          updated_at: string
+          user_id: string
+          walker: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          dog_ids?: string[]
+          id?: string
+          notes?: string | null
+          price?: number
+          reference: string
+          service_id: string
+          status?: string
+          time: string
+          updated_at?: string
+          user_id: string
+          walker?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          dog_ids?: string[]
+          id?: string
+          notes?: string | null
+          price?: number
+          reference?: string
+          service_id?: string
+          status?: string
+          time?: string
+          updated_at?: string
+          user_id?: string
+          walker?: string
+        }
+        Relationships: []
+      }
+      dogs: {
+        Row: {
+          age: number
+          behavior: string | null
+          breed: string
+          created_at: string
+          emergency: string | null
+          energy: string
+          feeding: string | null
+          id: string
+          medical: string | null
+          name: string
+          photo: string | null
+          updated_at: string
+          user_id: string
+          vet: string | null
+          weight: number
+        }
+        Insert: {
+          age?: number
+          behavior?: string | null
+          breed?: string
+          created_at?: string
+          emergency?: string | null
+          energy?: string
+          feeding?: string | null
+          id?: string
+          medical?: string | null
+          name: string
+          photo?: string | null
+          updated_at?: string
+          user_id: string
+          vet?: string | null
+          weight?: number
+        }
+        Update: {
+          age?: number
+          behavior?: string | null
+          breed?: string
+          created_at?: string
+          emergency?: string | null
+          energy?: string
+          feeding?: string | null
+          id?: string
+          medical?: string | null
+          name?: string
+          photo?: string | null
+          updated_at?: string
+          user_id?: string
+          vet?: string | null
+          weight?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          id: string
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
