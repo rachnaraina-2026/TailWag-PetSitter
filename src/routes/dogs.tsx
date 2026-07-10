@@ -38,10 +38,14 @@ function Dogs() {
           <DogForm
             title="Add a dog"
             initial={empty}
-            onSubmit={(d) => {
-              addDog(d);
-              toast.success(`${d.name} added!`);
-              setCreating(false);
+            onSubmit={async (d) => {
+              try {
+                await addDog(d);
+                toast.success(`${d.name} added!`);
+                setCreating(false);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Could not add dog");
+              }
             }}
           />
         </Dialog>
@@ -75,7 +79,7 @@ function Dogs() {
                 <Button size="sm" variant="outline" className="flex-1 rounded-full" onClick={() => setEditing(d)}>
                   <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
                 </Button>
-                <Button size="sm" variant="ghost" className="rounded-full text-destructive hover:text-destructive" onClick={() => { removeDog(d.id); toast.success(`${d.name} removed`); }}>
+                <Button size="sm" variant="ghost" className="rounded-full text-destructive hover:text-destructive" onClick={async () => { try { await removeDog(d.id); toast.success(`${d.name} removed`); } catch (err) { toast.error(err instanceof Error ? err.message : "Could not remove"); } }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -89,10 +93,14 @@ function Dogs() {
           <DogForm
             title="Edit dog"
             initial={editing}
-            onSubmit={(d) => {
-              updateDog(editing.id, d);
-              toast.success("Saved!");
-              setEditing(null);
+            onSubmit={async (d) => {
+              try {
+                await updateDog(editing.id, d);
+                toast.success("Saved!");
+                setEditing(null);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Could not save");
+              }
             }}
           />
         )}
